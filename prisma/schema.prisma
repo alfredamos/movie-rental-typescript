@@ -1,0 +1,71 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Genre {
+  @@map("genres")
+  id String @id @default(uuid())
+  name String @db.VarChar(255)
+  movies Movie[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model User {
+  @@map("users")
+  id String @id @default(uuid())
+  name String @db.VarChar(255)
+  email String @unique @db.VarChar(255)
+  phone String @db.VarChar(255)
+  password String @db.VarChar(255)
+  isGold Boolean @default(false)
+  userType UserType @default(Customer)
+  userRentals Rental[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Movie {
+  @@map("movies")
+  id String @id @default(uuid())
+  title String @db.VarChar(255)
+  genre Genre @relation(fields: [genreId], references: [id])
+  genreId String 
+  numberInStock Int
+  dailyRentalRate Decimal
+  rentedMovies Rental[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Rental {
+  @@map("rentals")
+  id String @id @default(uuid())
+  user User @relation(fields: [userId], references: [id])
+  userId String
+  movie Movie @relation(fields: [movieId], references: [id])
+  movieId String
+  dateOut DateTime @default(now())
+  dateReturn DateTime?
+  rentalFee Decimal
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+
+enum UserType {
+  Customer
+  Admin
+}

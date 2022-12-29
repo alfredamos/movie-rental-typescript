@@ -1,0 +1,13 @@
+import { UserType } from "./user-type.model";
+
+export class User {
+    id?: string;
+    name!: string;
+    email!: string;
+    phone!: string;
+    password!: string;
+    //hashedPassword?: string;
+    isGold?: boolean = false;
+    userType?: UserType.Customer;
+    
+}
