@@ -11,6 +11,8 @@ import movieRoute from "./routes/movie.route";
 import rentalRoute from "./routes/rental.route";
 import userRoute from "./routes/user.route";
 
+dotenv.config();
+
 const Port = process.env.PORT;
 const app = express();
 

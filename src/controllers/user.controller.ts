@@ -14,6 +14,14 @@ const registerUser = async(req: Request, res: Response) => {
     const {body: newUse} = req;
     const newUser = newUse as User;
 
+    const userExist = await prisma.user.findUnique({
+        where: {email: newUser.email},
+    })
+
+    if (userExist) {
+        throw catchError(StatusCodes.BAD_REQUEST, `User with email ${newUser.email} already exists.`);
+    }
+
     const hashedPassword = await bcrypt.hash(newUser.password, 10);
     newUser.password = hashedPassword;
 
@@ -21,9 +29,35 @@ const registerUser = async(req: Request, res: Response) => {
        data: {...newUser},
     });
 
-    
+    const token = tokenGenerator(user.id, user.name);
 
-    res.status(StatusCodes.CREATED).json(user);
+    res.status(StatusCodes.CREATED).json(token);
+};
+
+
+const loginUser = async (req: Request, res: Response) => {
+    const {body: {email, password}} = req;
+
+    const user = await prisma.user.findUnique({
+        where: {email},
+    })
+
+    if (!user) {
+        throw catchError(StatusCodes.BAD_REQUEST, `invalid credentials.`);
+    }
+
+    const hashedPassword = user.password;
+
+    const isValidPassword = await bcrypt.compare(password, hashedPassword);
+
+    if (!isValidPassword) {
+        throw catchError(StatusCodes.BAD_REQUEST, `invalid credentials.`);
+    }
+
+    const token = tokenGenerator(user.id, user.name);
+
+    res.status(StatusCodes.OK).json(token);
+
 };
 
 
@@ -95,10 +129,22 @@ const getUserById = async(req: Request, res: Response) => {
     res.status(StatusCodes.OK).json(user);
 };
 
-export {
-    registerUser,
+
+function tokenGenerator (id: string, name: string){
+    const secret_key = process.env.SECRET_KEY!;
+    return  jwt.sign({
+        id,
+        name
+    }, secret_key,{
+        expiresIn: '1hr'
+    });
+}
+
+export {   
     deleteUser,
     editUser,
     getAllUsers,
-    getUserById
+    getUserById,
+    loginUser,
+    registerUser,
 }
