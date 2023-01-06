@@ -1,11 +1,13 @@
-import {PrismaClient} from "@prisma/client";
+import {PrismaClient, UserType} from "@prisma/client";
 import {Request, Response, } from "express";
 import { StatusCodes } from "http-status-codes";
 import catchError from "http-errors";
 import * as bcrypt from 'bcrypt';
+import * as jwt from "jsonwebtoken";
 import {UuidTool} from "uuid-tool"
 
 import {User} from "../models/user.model";
+import { UserInfo } from "../models/user-info.model";
 
 
 const prisma = new PrismaClient();
@@ -30,7 +32,7 @@ const createUser = async (req: Request, res: Response) => {
        data: {...newUser},
     });
 
-    const userResp = {
+    const userResp: UserInfo = {
         id: user.id,
         name: user.name,
         userType: user.userType,
@@ -52,7 +54,12 @@ const deleteUser = async(req: Request, res: Response) => {
     }
 
     const deletedUser = await prisma.user.delete({
-        where: {id},
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        userType: true,
+      },
     });
 
     res.status(StatusCodes.OK).json(deletedUser);
@@ -60,38 +67,76 @@ const deleteUser = async(req: Request, res: Response) => {
 
 
 const editUser = async(req: Request, res: Response) => {
-    const {body: useToUpdate} = req;
-    const userToUpdate = useToUpdate as User;
-    const {id} = req.params;
+  const { body: userInput } = req;
+  const { id } = req.params;
+  const user = userInput as User;
 
-    let isEqual = UuidTool.compare(id, userToUpdate.id);
-    if (!isEqual){
-        throw catchError(StatusCodes.BAD_REQUEST, 'Id mismatch');
-    }
-    
-    const user = await prisma.user.findUnique({
-       where: {id},
-    });
+  const { email, password, newPassword, id: userId } = user;
 
-    if (!user){
-        throw catchError(StatusCodes.NOT_FOUND, `User with id = ${id} is not found`);
-    }
+  //----> Check for correctness of id.
+  let isEqual = UuidTool.compare(id, userId);
+  if (!isEqual) {
+    throw catchError(StatusCodes.BAD_REQUEST, "Id mismatch");
+  }
 
-    const updatedUser = await prisma.user.update({
-       where: {id},
-       data: {...userToUpdate},
-    });
+  //---> Check if user exists already.
+  const existingUser = await prisma.user.findUnique({ where: { email } });
 
-    res.status(StatusCodes.OK).json(updatedUser);
+  if (!existingUser) {
+    throw catchError(StatusCodes.BAD_REQUEST, "Invalid credentials");
+  }
+
+  //----> Check for the correctness of the user password.
+  const isValid = await bcrypt.compare(password, existingUser.password);
+
+  if (!isValid) {
+    throw catchError(StatusCodes.BAD_REQUEST, "Invalid credentials");
+  }
+
+  if (!newPassword) {
+    throw catchError(StatusCodes.BAD_REQUEST, "Provide the new password.");
+  }
+
+  //----> Hash the new password.
+  const hashedPassword = await bcrypt.hash(newPassword, 10);
+  user.password = hashedPassword;
+
+  //----> Store the new password in the database.
+
+  const updatedUser = await prisma.user.update({
+    where: { id },
+    data: { ...user },
+  });
+
+  //----> Generate Json web token.
+  const token = await generateJwtWebToken(
+    updatedUser.id,
+    updatedUser.name,
+    updatedUser.userType
+  );
+
+  //----> Make a user object information.
+  const userInfo: UserInfo = {
+    id: updatedUser.id,
+    name: updatedUser.name,
+    userType: updatedUser.userType,
+    token,
+  };
+
+  //----> Send the user information to client.
+  res.status(StatusCodes.OK).json(userInfo);
 };
 
 const getAllUsers = async(req: Request, res: Response) => {
     const users = await prisma.user.findMany({
-        include: {
-            userRentals: true,
-        }
+       select: {
+            id: true,
+            name: true,
+            userType: true,
+            userRentals: true,        
+       },
     });
-
+    
     res.status(StatusCodes.OK).json(users);
 };
 
@@ -101,9 +146,12 @@ const getUserById = async(req: Request, res: Response) => {
     
     const user = await prisma.user.findUnique({
        where: {id},
-       include: {
-        userRentals: true,
-       }
+       select: {
+            id: true,
+            name: true,
+            userType: true,
+            userRentals: true,        
+       },
     });
 
     if (!user){
@@ -114,7 +162,24 @@ const getUserById = async(req: Request, res: Response) => {
 };
 
 
-
+async function generateJwtWebToken(
+  id: string,
+  name: string,
+  userType: UserType
+) {
+  const secret_key = process.env.JSON_TOKEN_KEY!;
+  return await jwt.sign(
+    {
+      id,
+      name,
+      userType,
+    },
+    secret_key,
+    {
+      expiresIn: "1hr",
+    }
+  );
+}
 
 
 export {   
