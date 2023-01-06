@@ -1,31 +1,28 @@
 import { Router } from "express";
 import { userValidationMiddleware } from "../middleware/user-validation.middleware";
-import { userLoginValidationMiddleware } from "../middleware/user-login-validation.middleware";
-import {    
+import { 
+    createUser,   
     deleteUser,
     editUser,
     getAllUsers,
-    getUserById,
-    loginUser,
-    registerUser,
+    getUserById,    
 } from "../controllers/user.controller";
+
+
+import { checkIfAuthenticated } from "../middleware/check-if-authenticated.middleware";
+import { checkIfAdmin } from "../middleware/check-if-admin.middleware";
 
 const router = Router();
 
 router.route('/')
-    .get(getAllUsers);
+    .get(checkIfAuthenticated, getAllUsers)
+    .post(userValidationMiddleware, checkIfAuthenticated, checkIfAdmin, createUser);
     
 
-router.route('/register')
-    .post(userValidationMiddleware, registerUser);
-
-router.route('/login')
-    .post(userLoginValidationMiddleware, loginUser);
-
 router.route('/:id')
-    .delete(deleteUser)
-    .get(getUserById)
-    .patch(userValidationMiddleware, editUser);
+    .delete(checkIfAuthenticated, checkIfAdmin, deleteUser)
+    .get(checkIfAuthenticated, getUserById)
+    .patch(userValidationMiddleware, checkIfAuthenticated, checkIfAdmin, editUser);
 
 
 export default router;

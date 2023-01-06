@@ -12,7 +12,7 @@ export const rentalValidationMiddleware = (req: Request, res: Response, next: Ne
     const {error, value} = rentalValidation(rental);
 
     if (error){
-        const errorMessage = Object.values(error.details).join('. ')
+        const errorMessage = Object.values(error.details).map(err => err.message).join('. ')
 
         throw catchError(StatusCodes.BAD_REQUEST, `${errorMessage} - please provide all values`);
     }

@@ -5,9 +5,8 @@ export class User {
     name!: string;
     email!: string;
     phone!: string;
-    password!: string;
-    //hashedPassword?: string;
+    password!: string;    
     isGold?: boolean = false;
-    userType?: UserType.Customer;
+    userType: UserType;
     
 }

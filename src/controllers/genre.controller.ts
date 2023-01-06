@@ -3,6 +3,7 @@ import {Request, Response, } from "express";
 import { StatusCodes } from "http-status-codes";
 import catchError from "http-errors";
 import {Genre} from "../models/genre.model";
+import {UuidTool} from "uuid-tool"
 
 const prisma = new PrismaClient();
 
@@ -42,6 +43,11 @@ const editGenre = async(req: Request, res: Response) => {
     const {body: genToUpdate} = req;
     const genreToUpdate = genToUpdate as Genre;
     const {id} = req.params;
+
+    let isEqual = UuidTool.compare(id, genreToUpdate.id);
+    if (!isEqual){
+        throw catchError(StatusCodes.BAD_REQUEST, 'Id mismatch');
+    }
     
     const genre = await prisma.genre.findUnique({
        where: {id},

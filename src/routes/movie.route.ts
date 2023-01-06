@@ -8,16 +8,19 @@ import {
     getMovieById
 } from "../controllers/movie.controller";
 
+import { checkIfAuthenticated } from "../middleware/check-if-authenticated.middleware";
+import { checkIfAdmin } from "../middleware/check-if-admin.middleware";
+
 const router = Router();
 
 router.route('/')
-    .get(getAllMovies)
-    .post(movieValidationMiddleware, createMovie);
+    .get(checkIfAuthenticated, getAllMovies)
+    .post(movieValidationMiddleware, checkIfAuthenticated, checkIfAdmin, createMovie);
 
 router.route('/:id')
-    .delete(deleteMovie)
-    .get(getMovieById)
-    .patch(movieValidationMiddleware, editMovie);
+    .delete(checkIfAuthenticated, checkIfAdmin, deleteMovie)
+    .get(checkIfAuthenticated, getMovieById)
+    .patch(movieValidationMiddleware, checkIfAuthenticated, checkIfAdmin, editMovie);
 
 
 export default router;

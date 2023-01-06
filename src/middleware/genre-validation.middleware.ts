@@ -12,7 +12,7 @@ export const genreValidationMiddleware = (req: Request, res: Response, next: Nex
     const {error, value} = genreValidation(genre);
 
     if (error){
-        const errorMessage = Object.values(error.details).join('. ')
+        const errorMessage = Object.values(error.details).map(err => err.message).join('. ')
 
         throw catchError(StatusCodes.BAD_REQUEST, `${errorMessage} - please provide all values`);
     }

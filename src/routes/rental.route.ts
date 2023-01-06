@@ -8,16 +8,19 @@ import {
     getRentalById
 } from "../controllers/rental.controller";
 
-const router = Router();
+import { checkIfAuthenticated } from "../middleware/check-if-authenticated.middleware";
+import { checkIfAdmin } from "../middleware/check-if-admin.middleware";
 
+const router = Router();
+ 
 router.route('/')
-    .get(getAllRentals)
-    .post(rentalValidationMiddleware, createRental);
+    .get(checkIfAuthenticated, getAllRentals)
+    .post(rentalValidationMiddleware, checkIfAuthenticated, checkIfAdmin, createRental);
 
 router.route('/:id')
-    .delete(deleteRental)
-    .get(getRentalById)
-    .patch(rentalValidationMiddleware, editRental);
+    .delete(checkIfAuthenticated, checkIfAdmin, deleteRental)
+    .get(checkIfAuthenticated, getRentalById)
+    .patch(rentalValidationMiddleware, checkIfAuthenticated, checkIfAdmin, editRental);
 
 
 export default router;

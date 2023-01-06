@@ -9,7 +9,7 @@ const userSchema = Joi.object({
 
 });
 
-export const userValidation = (user: User) => {
+export const userValidation = (user: User) => {    
     const {
         name, 
         email, 

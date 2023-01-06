@@ -2,15 +2,16 @@ import {PrismaClient} from "@prisma/client";
 import {Request, Response, } from "express";
 import { StatusCodes } from "http-status-codes";
 import catchError from "http-errors";
-import * as bcrypt from "bcrypt";
-import * as jwt from "jsonwebtoken";
+import * as bcrypt from 'bcrypt';
+import {UuidTool} from "uuid-tool"
 
 import {User} from "../models/user.model";
+
 
 const prisma = new PrismaClient();
 
 
-const registerUser = async(req: Request, res: Response) => {
+const createUser = async (req: Request, res: Response) => {
     const {body: newUse} = req;
     const newUser = newUse as User;
 
@@ -29,36 +30,14 @@ const registerUser = async(req: Request, res: Response) => {
        data: {...newUser},
     });
 
-    const token = tokenGenerator(user.id, user.name);
-
-    res.status(StatusCodes.CREATED).json(token);
-};
-
-
-const loginUser = async (req: Request, res: Response) => {
-    const {body: {email, password}} = req;
-
-    const user = await prisma.user.findUnique({
-        where: {email},
-    })
-
-    if (!user) {
-        throw catchError(StatusCodes.BAD_REQUEST, `invalid credentials.`);
+    const userResp = {
+        id: user.id,
+        name: user.name,
+        userType: user.userType,
     }
 
-    const hashedPassword = user.password;
-
-    const isValidPassword = await bcrypt.compare(password, hashedPassword);
-
-    if (!isValidPassword) {
-        throw catchError(StatusCodes.BAD_REQUEST, `invalid credentials.`);
-    }
-
-    const token = tokenGenerator(user.id, user.name);
-
-    res.status(StatusCodes.OK).json(token);
-
-};
+    res.status(StatusCodes.CREATED).json(userResp);
+}
 
 
 const deleteUser = async(req: Request, res: Response) => {
@@ -84,6 +63,11 @@ const editUser = async(req: Request, res: Response) => {
     const {body: useToUpdate} = req;
     const userToUpdate = useToUpdate as User;
     const {id} = req.params;
+
+    let isEqual = UuidTool.compare(id, userToUpdate.id);
+    if (!isEqual){
+        throw catchError(StatusCodes.BAD_REQUEST, 'Id mismatch');
+    }
     
     const user = await prisma.user.findUnique({
        where: {id},
@@ -130,21 +114,13 @@ const getUserById = async(req: Request, res: Response) => {
 };
 
 
-function tokenGenerator (id: string, name: string){
-    const secret_key = process.env.SECRET_KEY!;
-    return  jwt.sign({
-        id,
-        name
-    }, secret_key,{
-        expiresIn: '1hr'
-    });
-}
+
+
 
 export {   
+    createUser,
     deleteUser,
     editUser,
     getAllUsers,
-    getUserById,
-    loginUser,
-    registerUser,
+    getUserById,   
 }
