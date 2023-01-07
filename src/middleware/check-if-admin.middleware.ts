@@ -8,7 +8,13 @@ export const checkIfAdmin = (req: Request, res: Response, next: NextFunction) =>
     const user = req['user'] as userResponse;
 
     if (user?.userType !== UserType.Admin) {
-        throw catchError(StatusCodes.FORBIDDEN, 'The user is not an admin, access denied');
+        next(
+          catchError(
+            StatusCodes.UNAUTHORIZED,
+            "You are not authorized to perform this task, access denied."
+          )
+        );
+        return;
     }
 
     next();

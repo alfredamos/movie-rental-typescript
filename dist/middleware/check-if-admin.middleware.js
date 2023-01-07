@@ -10,7 +10,8 @@ const client_1 = require("@prisma/client");
 const checkIfAdmin = (req, res, next) => {
     const user = req['user'];
     if ((user === null || user === void 0 ? void 0 : user.userType) !== client_1.UserType.Admin) {
-        throw (0, http_errors_1.default)(http_status_codes_1.StatusCodes.FORBIDDEN, 'The user is not an admin, access denied');
+        next((0, http_errors_1.default)(http_status_codes_1.StatusCodes.UNAUTHORIZED, "You are not authorized to perform this task, access denied."));
+        return;
     }
     next();
 };

@@ -12,8 +12,10 @@ const movieValidationMiddleware = (req, res, next) => {
     const movie = mov;
     const { error, value } = (0, movie_validation_1.movieValidation)(movie);
     if (error) {
-        const errorMessages = Object.values((error.details).map(err => err.message)).join('. ');
-        throw (0, http_errors_1.default)(http_status_codes_1.StatusCodes.BAD_REQUEST, `${JSON.stringify(errorMessages)} - please provide all values`);
+        let errorMessages;
+        errorMessages = error.details.map((err) => err.message).join(". ");
+        next((0, http_errors_1.default)(http_status_codes_1.StatusCodes.BAD_REQUEST, `${JSON.stringify(errorMessages)} - please provide all values.`));
+        return;
     }
     next();
     return value;

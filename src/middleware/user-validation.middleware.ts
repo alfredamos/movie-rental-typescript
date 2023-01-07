@@ -11,10 +11,18 @@ export const userValidationMiddleware = (req: Request, res: Response, next: Next
     
     const {error, value} = userValidation(user);
 
-    if (error){
-        const errorMessage = Object.values(error.details).join('. ')
+    if (error) {
+      let errorMessages: string;
 
-        throw catchError(StatusCodes.BAD_REQUEST, `${errorMessage} - please provide all values`);
+      errorMessages = error.details.map((err) => err.message).join(". ");
+
+      next(
+        catchError(
+          StatusCodes.BAD_REQUEST,
+          `${JSON.stringify(errorMessages)} - please provide all values.`
+        )
+      );
+      return;
     }
 
     next();

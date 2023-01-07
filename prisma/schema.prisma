@@ -10,6 +10,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+
 model Genre {
   @@map("genres")
   id String @id @default(uuid())

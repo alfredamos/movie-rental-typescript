@@ -43,15 +43,18 @@ const checkIfAuthenticated = (req, res, next) => {
     var _a, _b;
     const authJwtToken = (_b = (_a = req === null || req === void 0 ? void 0 : req.headers) === null || _a === void 0 ? void 0 : _a.authorization) === null || _b === void 0 ? void 0 : _b.split(' ')[1];
     if (!authJwtToken) {
-        throw (0, http_errors_1.default)(http_status_codes_1.StatusCodes.FORBIDDEN, 'The authentication JWT is not present, access denied.');
+        next((0, http_errors_1.default)(http_status_codes_1.StatusCodes.FORBIDDEN, 'The authentication JWT is not present, access denied.'));
+        return;
     }
     checkJwtValidity(authJwtToken)
         .then(user => {
         req['user'] = user;
         next();
+        return;
     })
         .catch(err => {
-        throw (0, http_errors_1.default)(http_status_codes_1.StatusCodes.FORBIDDEN, 'The authentication JWT is not present, access denied.');
+        next((0, http_errors_1.default)(http_status_codes_1.StatusCodes.FORBIDDEN, "The authentication JWT is not present, access denied."));
+        return;
     });
 };
 exports.checkIfAuthenticated = checkIfAuthenticated;

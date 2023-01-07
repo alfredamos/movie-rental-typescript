@@ -35,15 +35,55 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.registerUser = exports.loginUser = void 0;
+exports.registerUser = exports.profileOfUserById = exports.profileOfUser = exports.loginUser = exports.changePasswordOfUser = void 0;
 const client_1 = require("@prisma/client");
 const http_status_codes_1 = require("http-status-codes");
 const http_errors_1 = __importDefault(require("http-errors"));
 const bcrypt = __importStar(require("bcrypt"));
 const jwt = __importStar(require("jsonwebtoken"));
+const uuid_tool_1 = require("uuid-tool");
 const prisma = new client_1.PrismaClient();
+const changePasswordOfUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { body: userChangePwd } = req;
+    const userChangePassword = userChangePwd;
+    const { email, oldPassword, newPassword, confirmPassword } = userChangePassword;
+    //----> New password must match the confirm password.
+    if (newPassword.normalize() !== confirmPassword.normalize()) {
+        throw (0, http_errors_1.default)(http_status_codes_1.StatusCodes.BAD_REQUEST, "new password does not match confirm password.");
+    }
+    const user = yield prisma.user.findUnique({
+        where: { email },
+    });
+    if (!user) {
+        throw (0, http_errors_1.default)(http_status_codes_1.StatusCodes.BAD_REQUEST, "Invalid credentials");
+    }
+    //----> Retrieve the old password from database
+    const hashedPassword = user.password;
+    const isValid = yield bcrypt.compare(oldPassword, hashedPassword); //----> Compare the old password with the password stored in the database.
+    //----> Check the validity of password.
+    if (!isValid) {
+        throw (0, http_errors_1.default)(http_status_codes_1.StatusCodes.BAD_REQUEST, "Invalid credentials");
+    }
+    //----> Hash the new password.
+    const newHashedPassword = yield bcrypt.hash(newPassword, 10);
+    //----> Store the new password in the database.
+    const updatedUser = yield prisma.user.update({
+        where: { email },
+        data: Object.assign(Object.assign({}, user), { password: newHashedPassword }),
+    });
+    //----> Make a user object information.
+    const userInfo = {
+        id: updatedUser.id,
+        name: updatedUser.name,
+        userType: updatedUser.userType,
+        message: "Password is changed successfully, please login.",
+    };
+    //----> Send the user information to client.
+    res.status(http_status_codes_1.StatusCodes.OK).json(userInfo);
+});
+exports.changePasswordOfUser = changePasswordOfUser;
 const loginUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { body: { email, password } } = req;
+    const { body: { email, password }, } = req;
     const user = yield prisma.user.findUnique({
         where: { email },
     });
@@ -55,12 +95,13 @@ const loginUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     if (!isValidPassword) {
         throw (0, http_errors_1.default)(http_status_codes_1.StatusCodes.BAD_REQUEST, `invalid credentials.`);
     }
-    const token = tokenGenerator(user.id, user.name, user.userType);
+    const token = yield generateJwtWebToken(user.id, user.name, user.userType);
     const userResp = {
         id: user.id,
         name: user.name,
         userType: user.userType,
-        token: token
+        token: token,
+        message: "Login successfully",
     };
     res.status(http_status_codes_1.StatusCodes.OK).json(userResp);
 });
@@ -68,7 +109,6 @@ exports.loginUser = loginUser;
 const registerUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { body: newUse } = req;
     const newUser = newUse;
-    console.log("In auth-controller : ", { newUser });
     const userExist = yield prisma.user.findUnique({
         where: { email: newUser.email },
     });
@@ -80,23 +120,99 @@ const registerUser = (req, res) => __awaiter(void 0, void 0, void 0, function* (
     const user = yield prisma.user.create({
         data: Object.assign({}, newUser),
     });
-    const token = tokenGenerator(user.id, user.name, user.userType);
+    //const token = await generateJwtWebToken(user.id, user.name, user.userType);
     const userResp = {
         id: user.id,
         name: user.name,
         userType: user.userType,
-        token: token
+        message: "Signup is successful, please login.",
     };
     res.status(http_status_codes_1.StatusCodes.CREATED).json(userResp);
 });
 exports.registerUser = registerUser;
-function tokenGenerator(id, name, userType) {
-    const secret_key = process.env.JSON_TOKEN_KEY;
-    return jwt.sign({
-        id,
-        name,
-        userType
-    }, secret_key, {
-        expiresIn: '1hr'
+const profileOfUserById = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { body: userInput } = req;
+    const { id } = req.params;
+    const user = userInput;
+    const { email, password, newPassword, id: userId } = user;
+    //----> Check for correctness of id.
+    let isEqual = uuid_tool_1.UuidTool.compare(id, userId);
+    if (!isEqual) {
+        throw (0, http_errors_1.default)(http_status_codes_1.StatusCodes.BAD_REQUEST, "Id mismatch");
+    }
+    //---> Check if user exists already.
+    const existingUser = yield prisma.user.findUnique({ where: { email } });
+    if (!existingUser) {
+        throw (0, http_errors_1.default)(http_status_codes_1.StatusCodes.BAD_REQUEST, "Invalid credentials");
+    }
+    //----> Check for the correctness of the user password.
+    const isValid = yield bcrypt.compare(password, existingUser.password);
+    if (!isValid) {
+        throw (0, http_errors_1.default)(http_status_codes_1.StatusCodes.BAD_REQUEST, "Invalid credentials");
+    }
+    //----> Hash the new password.
+    const hashedPassword = yield bcrypt.hash(newPassword, 10);
+    user.password = hashedPassword;
+    delete user.newPassword;
+    //----> Store the new password in the database.
+    const updatedUser = yield prisma.user.update({
+        where: { id },
+        data: Object.assign({}, user),
+    });
+    //----> Make a user object information.
+    const userInfo = {
+        id: updatedUser.id,
+        name: updatedUser.name,
+        userType: updatedUser.userType,
+        message: "Password is changed successfully, please login.",
+    };
+    //----> Send the user information to client.
+    res.status(http_status_codes_1.StatusCodes.OK).json(userInfo);
+});
+exports.profileOfUserById = profileOfUserById;
+const profileOfUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { body: userInput } = req;
+    const user = userInput;
+    const { email, password, newPassword } = user;
+    //---> Check if user exists already.
+    const existingUser = yield prisma.user.findUnique({ where: { email } });
+    if (!existingUser) {
+        throw (0, http_errors_1.default)(http_status_codes_1.StatusCodes.BAD_REQUEST, "Invalid credentials");
+    }
+    //----> Check for the correctness of the user password.
+    const isValid = yield bcrypt.compare(password, existingUser.password);
+    if (!isValid) {
+        throw (0, http_errors_1.default)(http_status_codes_1.StatusCodes.BAD_REQUEST, "Invalid credentials");
+    }
+    //----> Hash the new password.
+    const hashedPassword = yield bcrypt.hash(newPassword, 10);
+    user.password = hashedPassword;
+    delete user.newPassword;
+    //----> Store the new password in the database.
+    const updatedUser = yield prisma.user.update({
+        where: { email },
+        data: Object.assign(Object.assign({}, user), { id: existingUser.id }),
+    });
+    //----> Make a user object information.
+    const userInfo = {
+        id: updatedUser.id,
+        name: updatedUser.name,
+        userType: updatedUser.userType,
+        message: "Password is changed successfully, please login.",
+    };
+    //----> Send the user information to client.
+    res.status(http_status_codes_1.StatusCodes.OK).json(userInfo);
+});
+exports.profileOfUser = profileOfUser;
+function generateJwtWebToken(id, name, userType) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const secret_key = process.env.JSON_TOKEN_KEY;
+        return yield jwt.sign({
+            id,
+            name,
+            userType,
+        }, secret_key, {
+            expiresIn: "1hr",
+        });
     });
 }

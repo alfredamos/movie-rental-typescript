@@ -11,10 +11,18 @@ export const movieValidationMiddleware = (req: Request, res: Response, next: Nex
     
     const {error, value} = movieValidation(movie);
 
-    if (error){
-        const errorMessages = Object.values((error.details).map(err => err.message)).join('. ');
+    if (error) {
+      let errorMessages: string;
 
-        throw catchError(StatusCodes.BAD_REQUEST, `${JSON.stringify(errorMessages)} - please provide all values`);
+      errorMessages = error.details.map((err) => err.message).join(". ");
+
+      next(
+        catchError(
+          StatusCodes.BAD_REQUEST,
+          `${JSON.stringify(errorMessages)} - please provide all values.`
+        )
+      );
+      return;
     }
 
     next();

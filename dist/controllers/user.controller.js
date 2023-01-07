@@ -40,6 +40,7 @@ const client_1 = require("@prisma/client");
 const http_status_codes_1 = require("http-status-codes");
 const http_errors_1 = __importDefault(require("http-errors"));
 const bcrypt = __importStar(require("bcrypt"));
+const jwt = __importStar(require("jsonwebtoken"));
 const uuid_tool_1 = require("uuid-tool");
 const prisma = new client_1.PrismaClient();
 const createUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -74,36 +75,67 @@ const deleteUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
     }
     const deletedUser = yield prisma.user.delete({
         where: { id },
+        select: {
+            id: true,
+            name: true,
+            userType: true,
+        },
     });
     res.status(http_status_codes_1.StatusCodes.OK).json(deletedUser);
 });
 exports.deleteUser = deleteUser;
 const editUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { body: useToUpdate } = req;
-    const userToUpdate = useToUpdate;
+    const { body: userInput } = req;
     const { id } = req.params;
-    let isEqual = uuid_tool_1.UuidTool.compare(id, userToUpdate.id);
+    const user = userInput;
+    const { email, password, newPassword, id: userId } = user;
+    //----> Check for correctness of id.
+    let isEqual = uuid_tool_1.UuidTool.compare(id, userId);
     if (!isEqual) {
-        throw (0, http_errors_1.default)(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Id mismatch');
+        throw (0, http_errors_1.default)(http_status_codes_1.StatusCodes.BAD_REQUEST, "Id mismatch");
     }
-    const user = yield prisma.user.findUnique({
-        where: { id },
-    });
-    if (!user) {
-        throw (0, http_errors_1.default)(http_status_codes_1.StatusCodes.NOT_FOUND, `User with id = ${id} is not found`);
+    //---> Check if user exists already.
+    const existingUser = yield prisma.user.findUnique({ where: { email } });
+    if (!existingUser) {
+        throw (0, http_errors_1.default)(http_status_codes_1.StatusCodes.BAD_REQUEST, "Invalid credentials");
     }
+    //----> Check for the correctness of the user password.
+    const isValid = yield bcrypt.compare(password, existingUser.password);
+    if (!isValid) {
+        throw (0, http_errors_1.default)(http_status_codes_1.StatusCodes.BAD_REQUEST, "Invalid credentials");
+    }
+    if (!newPassword) {
+        throw (0, http_errors_1.default)(http_status_codes_1.StatusCodes.BAD_REQUEST, "Provide the new password.");
+    }
+    //----> Hash the new password.
+    const hashedPassword = yield bcrypt.hash(newPassword, 10);
+    user.password = hashedPassword;
+    //----> Store the new password in the database.
     const updatedUser = yield prisma.user.update({
         where: { id },
-        data: Object.assign({}, userToUpdate),
+        data: Object.assign({}, user),
     });
-    res.status(http_status_codes_1.StatusCodes.OK).json(updatedUser);
+    //----> Generate Json web token.
+    const token = yield generateJwtWebToken(updatedUser.id, updatedUser.name, updatedUser.userType);
+    //----> Make a user object information.
+    const userInfo = {
+        id: updatedUser.id,
+        name: updatedUser.name,
+        userType: updatedUser.userType,
+        token,
+    };
+    //----> Send the user information to client.
+    res.status(http_status_codes_1.StatusCodes.OK).json(userInfo);
 });
 exports.editUser = editUser;
 const getAllUsers = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const users = yield prisma.user.findMany({
-        include: {
+        select: {
+            id: true,
+            name: true,
+            userType: true,
             userRentals: true,
-        }
+        },
     });
     res.status(http_status_codes_1.StatusCodes.OK).json(users);
 });
@@ -112,9 +144,12 @@ const getUserById = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
     const { id } = req.params;
     const user = yield prisma.user.findUnique({
         where: { id },
-        include: {
+        select: {
+            id: true,
+            name: true,
+            userType: true,
             userRentals: true,
-        }
+        },
     });
     if (!user) {
         throw (0, http_errors_1.default)(http_status_codes_1.StatusCodes.NOT_FOUND, `User with id = ${id} is not found`);
@@ -122,3 +157,15 @@ const getUserById = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
     res.status(http_status_codes_1.StatusCodes.OK).json(user);
 });
 exports.getUserById = getUserById;
+function generateJwtWebToken(id, name, userType) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const secret_key = process.env.JSON_TOKEN_KEY;
+        return yield jwt.sign({
+            id,
+            name,
+            userType,
+        }, secret_key, {
+            expiresIn: "1hr",
+        });
+    });
+}

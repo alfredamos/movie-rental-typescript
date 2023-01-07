@@ -7,7 +7,8 @@ export const checkIfAuthenticated = (req: Request, res: Response, next: NextFunc
     const authJwtToken = req?.headers?.authorization?.split(' ')[1];
 
     if (!authJwtToken){
-        throw catchError(StatusCodes.FORBIDDEN, 'The authentication JWT is not present, access denied.');
+        next(catchError(StatusCodes.FORBIDDEN, 'The authentication JWT is not present, access denied.'));
+        return;
     }
 
     checkJwtValidity(authJwtToken)
@@ -15,9 +16,16 @@ export const checkIfAuthenticated = (req: Request, res: Response, next: NextFunc
             req['user']  = user;
 
             next();
+            return;
         })
         .catch(err => {
-            throw catchError(StatusCodes.FORBIDDEN, 'The authentication JWT is not present, access denied.');
+            next(
+              catchError(
+                StatusCodes.FORBIDDEN,
+                "The authentication JWT is not present, access denied."
+              )
+            );
+            return;
         });
 
 }

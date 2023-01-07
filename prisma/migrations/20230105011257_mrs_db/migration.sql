@@ -16,6 +16,7 @@ CREATE TABLE `users` (
     `phone` VARCHAR(255) NOT NULL,
     `password` VARCHAR(255) NOT NULL,
     `isGold` BOOLEAN NOT NULL DEFAULT false,
+    `userType` ENUM('Customer', 'Admin') NOT NULL DEFAULT 'Customer',
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
 

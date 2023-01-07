@@ -5,7 +5,8 @@ export class User {
     name!: string;
     email!: string;
     phone!: string;
-    password!: string;    
+    password!: string;  
+    newPassword?: string;  
     isGold?: boolean = false;
     userType: UserType;
     
